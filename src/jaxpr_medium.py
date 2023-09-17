@@ -26,3 +26,15 @@ def simple_graph(x):
 inp = jnp.arange(3, dtype=jnp.float32)
 print(jax.make_jaxpr(simple_graph)(inp))
 
+# Automatic Differentiation
+
+grad_fn = jax.grad(simple_graph)
+gradients = grad_fn(inp)
+print("Gradient", gradients)
+
+print(jax.make_jaxpr(grad_fn)(inp))
+
+val_grad_fn = jax.value_and_grad(simple_graph)
+print(val_grad_fn(inp))
+
+# Speeding up with jit
