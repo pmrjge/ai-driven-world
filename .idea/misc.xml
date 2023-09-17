@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Black">
+    <option name="enabledOnReformat" value="true" />
+    <option name="enabledOnSave" value="true" />
+    <option name="executionMode" value="BINARY" />
+    <option name="pathToExecutable" value="/usr/bin/black" />
+    <option name="sdkUUID" value="019c4567-a213-4bde-a6e6-9404d2667a49" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="pystudio" project-jdk-type="Python SDK" />
+</project>
