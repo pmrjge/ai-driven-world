@@ -1,5 +1,6 @@
 import flax
 from flax import linen as nn
+import jax
 
 
 class SimpleClassifier(nn.Module):
@@ -27,3 +28,15 @@ class SimpleClassifierCompact(nn.Module):
         x = nn.tanh(x)
         x = nn.Dense(features=self.num_outputs)(x)
         return x
+
+
+# training a NN
+
+model = SimpleClassifierCompact(num_hidden=8, num_outputs=1)
+
+rng = jax.random.PRNGKey(42)
+rng, inp_rng, init_rng = jax.random.split(rng, 3)
+
+inp = jax.random.normal(inp_rng, (8, 2))
+params = model.init(init_rng, inp)
+print(params)
