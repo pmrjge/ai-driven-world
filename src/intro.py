@@ -57,5 +57,3 @@ jax_rn2 = jrnd.normal(sk2)
 
 print("JAX - Random number 1:", jax_rn1)
 print("JAX - Random number 2:", jax_rn2)
-
-
