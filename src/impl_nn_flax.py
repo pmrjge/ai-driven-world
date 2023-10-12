@@ -6,6 +6,7 @@ import torch.utils.data as data
 import matplotlib.pyplot as plt
 import optax
 from flax.training import train_state
+from jax import numpy as jnp
 
 class SimpleClassifier(nn.Module):
     num_hidden: int
@@ -123,3 +124,17 @@ optimizer = optax.sgd(learning_rate=0.1)
 model_state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
 
 # Loss Function
+def calculate_loss_acc(state, params, batch):
+    data_input, labels = batch
+    logits = state.apply_fn(params, data_input).squeeze(axis=-1)
+    pred_labels = (logits > 0).astype(jnp.float32)
+
+    loss = optax.sigmoid_binary_cross_entropy(logits, labels).mean()
+    acc = (pred_labels == labels).mean()
+    return loss, acc
+
+batch = next(iter(data_loader))
+print(calculate_loss_acc(model_state, model_state.params, batch))
+
+# Creating an efficient training and validation step
+
