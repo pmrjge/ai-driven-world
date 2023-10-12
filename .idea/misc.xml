@@ -5,7 +5,7 @@
     <option name="enabledOnSave" value="true" />
     <option name="executionMode" value="BINARY" />
     <option name="pathToExecutable" value="/usr/bin/black" />
-    <option name="sdkUUID" value="019c4567-a213-4bde-a6e6-9404d2667a49" />
+    <option name="sdkName" value="pylabx" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="pystudio" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="pylabx" project-jdk-type="Python SDK" />
 </project>
