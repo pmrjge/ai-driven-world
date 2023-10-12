@@ -5,7 +5,7 @@ import jax
 import torch.utils.data as data
 import matplotlib.pyplot as plt
 import optax
-from flax.training import train_state
+from flax.training import train_state, checkpoints
 from jax import numpy as jnp
 from tqdm import tqdm
 
@@ -164,3 +164,12 @@ def train_model(state, data_loader, num_epochs=100):
             state, loss, acc = train_step(state, batch)
     return state
 
+trained_model_state = train_model(model_state, train_dataloader, num_epochs=100)
+
+ckpt_dir='my_checkpoints/'
+prefix='my_model'
+checkpoints.save_checkpoint(ckpt_dir=ckpt_dir, target=trained_model_state, step=100, prefix=prefix, overwrite=True)
+
+loaded_model_state = checkpoints.restore_checkpoint(ckpt_dir=ckpt_dir, target=model_state, prefix=prefix)
+
+# Evaluation
