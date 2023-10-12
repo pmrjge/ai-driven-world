@@ -54,3 +54,48 @@ for file_name in pretrained_files:
 
 
 # Common activation functions
+class Sigmoid(nn.Module):
+    def __call__(self, x):
+        return 1 / (1 + jnp.exp(-x))
+
+
+class Tanh(nn.Module):
+    def __call__(self, x):
+        x_exp, neg_x_exp = jnp.exp(x), jnp.exp(-x)
+        return (x_exp - neg_x_exp) / (x_exp + neg_x_exp)
+
+
+class ReLU(nn.Module):
+    def __call__(self, x):
+        return jnp.maximum(0, x)
+
+
+class LeakyReLU(nn.Module):
+    alpha: float = 0.1
+
+    def __call__(self, x):
+        return jnp.where(x>0, x, self.alpha * x)
+
+
+class ELU(nn.Module):
+    def __call__(self, x):
+        return jnp.where(x>0, x, jnp.exp(x) - 1)
+
+
+class Swish(nn.Module):
+    def __call__(self, x):
+        return x * nn.sigmoid(x)
+
+
+act_fn_by_name = {
+    "sigmoid": Sigmoid,
+    "tanh": Tanh,
+    "relu": ReLU,
+    "leakyrelu": LeakyReLU,
+    "elu": ELU,
+    "swish": Swish
+}
+
+
+# Visualizing activation functions
+
