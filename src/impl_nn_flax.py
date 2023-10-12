@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import optax
 from flax.training import train_state
 from jax import numpy as jnp
+from tqdm import tqdm
 
 class SimpleClassifier(nn.Module):
     num_hidden: int
@@ -154,3 +155,12 @@ def eval_step(state, batch):
     return acc
 
 # Training
+train_dataset = XORDataset(size=2500, seed=42)
+train_dataloader = data.DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=numpy_collate)
+
+def train_model(state, data_loader, num_epochs=100):
+    for epoch in tqdm(range(num_epochs)):
+        for batch in data_loader:
+            state, loss, acc = train_step(state, batch)
+    return state
+
