@@ -138,3 +138,19 @@ print(calculate_loss_acc(model_state, model_state.params, batch))
 
 # Creating an efficient training and validation step
 
+@jax.jit
+def train_step(state, batch):
+    grad_fn = jax.value_and_grad(calculate_loss_acc, argnums=1, has_aux=True)
+
+    (loss,acc), grads = grad_fn(state, state.params, batch)
+
+    state = state.apply_gradients(grads=grads)
+
+    return state, loss, acc
+
+@jax.jit
+def eval_step(state, batch):
+    _, acc = calculate_loss_acc(state, state.params, batch)
+    return acc
+
+# Training
