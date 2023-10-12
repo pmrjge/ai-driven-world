@@ -4,7 +4,8 @@ from flax import linen as nn
 import jax
 import torch.utils.data as data
 import matplotlib.pyplot as plt
-
+import optax
+from flax.training import train_state
 
 class SimpleClassifier(nn.Module):
     num_hidden: int
@@ -117,3 +118,8 @@ print("Data labels", data_labels.shape, "\n", data_labels)
 
 
 # Optimization
+optimizer = optax.sgd(learning_rate=0.1)
+
+model_state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=optimizer)
+
+# Loss Function
