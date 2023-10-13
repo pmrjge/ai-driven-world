@@ -249,3 +249,51 @@ test_loader = data.DataLoader(test_set, batch_size=1024, shuffle=False, drop_las
 
 # visualizing the gradient flow after initialization
 
+# training a model
+
+def calculate_loss(params, apply_fn, batch):
+    imgs, labels = batch
+    logits = apply_fn(params, imgs)
+    loss = optax.softmax_cross_entropy_with_integer_labels(logits, labels).mean()
+    acc = (labels == logits.argmax(axis=-1)).mean()
+    return loss, acc
+
+
+@jax.jit
+def train_step(state, batch):
+    grad_fn = jax.value_and_grad(calculate_loss, has_aux=True)
+    (_, acc), grads = grad_fn(state.params, state.apply_fn, batch)
+    state = state.apply_gradients(grads=grads)
+    return state, acc
+
+@jax.jit
+def eval_step(state, batch):
+    _, acc = calculate_loss(state.params, state.apply_fn, batch)
+    return acc
+
+
+def train_model(net, model_name, max_epochs=50, patience=7, batch_size=256, overwrite=False):
+    file_exists = os.path.isfile(_get_model_file(CHECKPOINT_PATH, model_name))
+    if file_exists and not overwrite:
+        state = None
+    else:
+        if file_exists:
+            print("Model file exists, but will be overwritten")
+
+        exmp_batch = jnp.zeros((batch_size, 3 * 28 * 28))
+        params = net.init(random.PRNGKey(42), exmp_batch[0])
+        state = train_state.TrainState.create(apply_fn=net.apply, params=params, tx=optax.sgd(learning_rate=1e-2, momentum=0.9))
+
+        train_loader_local = data.DataLoader(train_set, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=numpy_collate, generator=torch.Generator().manual_seed(42))
+
+        val_scores = []
+        best_val_epoch = - 1
+        for epoch in range(max_epochs):
+            train_acc = 0.
+            for batch in tqdm(train_loader_local, desc=f"Epoch {epoch + 1}", leave=False):
+                state, acc = train_step(state, batch)
+                train_acc += acc
+            train_acc /= len(train_loader_local)
+
+
+# for now this part will remain incomplete because its essence was captured
