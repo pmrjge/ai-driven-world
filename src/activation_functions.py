@@ -93,9 +93,35 @@ act_fn_by_name = {
     "relu": ReLU,
     "leakyrelu": LeakyReLU,
     "elu": ELU,
-    "swish": Swish
+    "swish": Swish,
 }
 
 
 # Visualizing activation functions
 
+def get_grads(act_fn, x):
+    return jax.vmap(jax.grad(act_fn))(x)
+
+
+def vis_act_fn(act_fn, ax, x):
+    y = act_fn(x)
+    y_grads = get_grads(act_fn, x)
+    ax.plot(x, y, linewidth=2, label="ActFn")
+    ax.plot(x, y_grads, linewidth=2, label="Gradient")
+    ax.set_title(act_fn.__class__.__name__)
+    ax.legend()
+    ax.set_ylim(-1.5, x.max())
+
+
+act_fns = [act_fn() for act_fn in act_fn_by_name.values()]
+x = np.linspace(-5, 5, 1000)
+rows = math.ceil(len(act_fns) / 2.0)
+fig, ax = plt.subplots(rows, 2, figsize=(8, rows*4))
+
+for i, act_fn in enumerate(act_fns):
+    vis_act_fn(act_fn, ax[divmod(i, 2)], x)
+fig.subplots_adjust(hspace=0.3)
+plt.show()
+
+
+# Analysing the effect of activation functions
