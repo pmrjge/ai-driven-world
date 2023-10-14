@@ -260,3 +260,17 @@ visualize_activations(model, params, print_variance=True)
 
 
 # Constant Variance
+
+def get_var_init_func(std=0.01):
+    return lambda key, shape, dtype: std*random.normal(key, shape, dtype=dtype)
+
+
+model, params = init_simple_model(get_var_init_func(std=0.01))
+visualize_activations(model, params, print_variance=True)
+
+model, params = init_simple_model(get_var_init_func(std=0.1))
+
+visualize_activations(model, params, print_variance=True)
+
+# How to find the appropriate initialization values
+
