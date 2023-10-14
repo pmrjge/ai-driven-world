@@ -242,3 +242,11 @@ def visualize_activations(model, params, color="C0", print_variance=False):
 ##############################################################
 
 # Initialization
+def init_simple_model(kernel_init, act_fn=act_fn_by_name['identity']):
+    model = BaseNetwork(act_fn=act_fn, kernel_init=kernel_init)
+    params = model.init(random.PRNGKey(42), exmp_imgs)
+    return model, params
+
+
+# Constant initialization
+
