@@ -250,3 +250,13 @@ def init_simple_model(kernel_init, act_fn=act_fn_by_name['identity']):
 
 # Constant initialization
 
+def get_const_init_func(c=0.0):
+    return lambda key, shape, dtype: c*jnp.ones(shape, dtype=dtype)
+
+
+model, params = init_simple_model(get_const_init_func(c=0.005))
+visualize_gradients(model, params)
+visualize_activations(model, params, print_variance=True)
+
+
+# Constant Variance
