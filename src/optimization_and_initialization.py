@@ -274,3 +274,38 @@ visualize_activations(model, params, print_variance=True)
 
 # How to find the appropriate initialization values
 
+equal_var_init = lambda key, shape, dtype: 1.0 / np.sqrt(shape[0]) * random.normal(key, shape, dtype=dtype)
+
+model, params = init_simple_model(equal_var_init)
+
+visualize_weight_distribution(params)
+visualize_activations(model, params, print_variance=True)
+
+def xavier_init(key, shape, dtype):
+    bound = math.sqrt(6) / math.sqrt(shape[0] + shape[1])
+    return random.uniform(key, shape, dtype, minval=-bound, maxval=bound)
+
+
+model, params = init_simple_model(xavier_init)
+visualize_gradients(model, params, print_variance=True)
+visualize_activations(model, params, print_variance=True)
+
+model, params = init_simple_model(xavier_init, act_fn=nn.tanh)
+visualize_gradients(model, params, print_variance=True)
+visualize_activations(model, params, print_variance=True)
+
+num_input_feats = np.prod(exmp_imgs.shape[1:])
+def kaiming_init(key, shape, dtype):
+    if shape[0] == num_input_feats:
+        std = 1 / np.sqrt(shape[0])
+    else:
+        std = np.sqrt(2 / shape[0])
+
+    return std * random.normal(key, shape, dtype)
+
+model, params = init_simple_model(kaiming_init, act_fn=nn.relu)
+visualize_gradients(model, params, print_variance=True)
+visualize_activations(model, params, print_variance=True)
+
+# Optimization
+
