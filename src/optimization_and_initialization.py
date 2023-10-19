@@ -496,3 +496,57 @@ def test_model(state, data_loader):
     test_acc = true_preds / count
     return test_acc.item()
 
+class Optimizer(NamedTuple):
+    init: Callable[[PyTree], tuple]
+    update: Callable[[PyTree, tuple, Optional[PyTree]], Tuple[PyTree, tuple]]
+
+
+def sgd(lr):
+    def init(params):
+        return tuple()
+
+    def update(updates, state, params=None):
+        updates = tree_map(lambda u: -lr * u, updates)
+        return updates, state
+
+    return Optimizer(init=init, update=update)
+
+
+def sgd_momentum(lr, momentum=0.0):
+    def init(params):
+        param_momentum = tree_map(jnp.zeros_like, params)
+
+    def update(updates, state, params=None):
+        state = tree_map(lambda m, g: (1 - momentum) * g + momentum * m, state, updates)
+        updates = tree_map(lambda m: -lr * m, state)
+
+        return updates, state
+
+    return Optimizer(init=init, update=update)
+
+
+def adam(lr, beta1=0.9, beta2=0.999, eps=1e-8):
+    def init(params):
+        step = 0.
+        param_momentum = tree_map(jnp.zeros_like, params)
+        param_2nd_momentum = tree_map(jnp.zeros_like, params)
+        return (step, param_momentum, param_2nd_momentum)
+
+    def update(updates, state, params=None):
+        step, param_momentum, param_2nd_momentum = state
+        step += 1
+        param_momentum = tree_map(lambda m, g: (1 - beta1) * g + beta1 * m, param_momentum, updates)
+        param_2nd_momentum = tree_map(lambda m2, g: (1-beta2) * g**2 + beta2 * m2, param_2nd_momentum, updates)
+
+        def update_param(m1, m2):
+            m1 /= 1 - beta1**step
+            m2 /= 1 - beta2 ** step
+
+            return -m1 * lr /(jnp.sqrt(m2) + eps)
+
+        updates = tree_map(update_param, param_momentum, param_2nd_momentum)
+
+        return updates, (step, param_momentum, param_2nd_momentum)
+
+
+# comparing optimizers on model training
