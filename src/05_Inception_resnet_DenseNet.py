@@ -28,7 +28,6 @@ import optax
 
 import torch
 import torch.utils.data as data
-from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
@@ -149,7 +148,6 @@ class TrainerModule:
         self.seed = seed
         self.model = self.model_class(**self.model_hparams)
         self.log_dir = os.path.join(CHECKPOINT_PATH, self.model_name)
-        self.logger = SummaryWriter(log_dir=self.log_dir)
         self.create_functions()
         self.init_model(exmp_imgs)
 
@@ -233,11 +231,9 @@ class TrainerModule:
             self.train_epoch(train_loader, epoch=epoch_idx)
             if epoch_idx % 2 == 0:
                 eval_acc = self.eval_model(val_loader)
-                self.logger.add_scalar('val/acc', eval_acc, global_step=epoch_idx)
                 if eval_acc >= best_eval:
                     best_eval = eval_acc
                     self.save_model(step=epoch_idx)
-                self.logger.flush()
 
     def train_epoch(self, train_loader, epoch):
         # Train model for one epoch, and log avg loss and accuracy
@@ -248,7 +244,6 @@ class TrainerModule:
             metrics['acc'].append(acc)
         for key in metrics:
             avg_val = np.stack(jax.device_get(metrics[key])).mean()
-            self.logger.add_scalar('train/'+key, avg_val, global_step=epoch)
 
     def eval_model(self, data_loader):
         # Test model on all images of a data loader and return avg loss
@@ -313,3 +308,72 @@ class InceptionBlock(nn.Module):
         x_1x1 = self.act_fn(x_1x1)
 
         x_3x3 = nn.Conv(self.c_red["3x3"], kernel_size=(1,1), kernel_init=googlenet_kernel_init, use_bias=False)(x)
+        x_3x3 = nn.BatchNorm()(x_3x3, use_running_average=not train)
+        x_3x3 = self.act_fn(x_3x3)
+        x_3x3 = nn.Conv(self.c_out["3x3"], kernel_size=(3, 3), kernel_init=googlenet_kernel_init, use_bias=False)(x_3x3)
+        x_3x3 = nn.BatchNorm()(x_3x3, use_running_average=not train)
+        x_3x3 = self.act_fn(x_3x3)
+
+        # 5x5 convolution branch
+        x_5x5 = nn.Conv(self.c_red["5x5"], kernel_size=(1, 1), kernel_init=googlenet_kernel_init, use_bias=False)(x)
+        x_5x5 = nn.BatchNorm()(x_5x5, use_running_average=not train)
+        x_5x5 = self.act_fn(x_5x5)
+        x_5x5 = nn.Conv(self.c_out["5x5"], kernel_size=(5, 5), kernel_init=googlenet_kernel_init, use_bias=False)(x_5x5)
+        x_5x5 = nn.BatchNorm()(x_5x5, use_running_average=not train)
+        x_5x5 = self.act_fn(x_5x5)
+
+        # Max-pool branch
+        x_max = nn.max_pool(x, (3, 3), strides=(2, 2))
+        x_max = nn.Conv(self.c_out["max"], kernel_size=(1, 1), kernel_init=googlenet_kernel_init, use_bias=False)(x)
+        x_max = nn.BatchNorm()(x_max, use_running_average=not train)
+        x_max = self.act_fn(x_max)
+
+        x_out = jnp.concatenate([x_1x1, x_3x3, x_5x5, x_max], axis=-1)
+        return x_out
+
+
+class GoogleNet(nn.Module):
+    num_classes : int
+    act_fn : callable
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        # A first convolution on the original image to scale up the channel size
+        x = nn.Conv(64, kernel_size=(3, 3), kernel_init=googlenet_kernel_init, use_bias=False)(x)
+        x = nn.BatchNorm()(x, use_running_average=not train)
+        x = self.act_fn(x)
+
+        # Stacking inception blocks
+        inception_blocks = [
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 16, "3x3": 32, "5x5": 8, "max": 8}, act_fn=self.act_fn),
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 24, "3x3": 48, "5x5": 12, "max": 12}, act_fn=self.act_fn),
+            lambda inp: nn.max_pool(inp, (3, 3), strides=(2, 2)),  # 32x32 => 16x16
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 24, "3x3": 48, "5x5": 12, "max": 12}, act_fn=self.act_fn),
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 16, "3x3": 48, "5x5": 16, "max": 16}, act_fn=self.act_fn),
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 16, "3x3": 48, "5x5": 16, "max": 16}, act_fn=self.act_fn),
+            InceptionBlock(c_red={"3x3": 32, "5x5": 16}, c_out={"1x1": 32, "3x3": 48, "5x5": 24, "max": 24}, act_fn=self.act_fn),
+            lambda inp: nn.max_pool(inp, (3, 3), strides=(2, 2)),  # 16x16 => 8x8
+            InceptionBlock(c_red={"3x3": 48, "5x5": 16}, c_out={"1x1": 32, "3x3": 64, "5x5": 16, "max": 16}, act_fn=self.act_fn),
+            InceptionBlock(c_red={"3x3": 48, "5x5": 16}, c_out={"1x1": 32, "3x3": 64, "5x5": 16, "max": 16}, act_fn=self.act_fn)
+        ]
+        for block in inception_blocks:
+            x = block(x, train=train) if isinstance(block, InceptionBlock) else block(x)
+
+        # Mapping to classification output
+        x = x.mean(axis=(1, 2))
+        x = nn.Dense(self.num_classes)(x)
+        return x
+
+
+googlenet_trainer, googlenet_results = train_classifier(model_class=GoogleNet,
+                                                        model_name="GoogleNet",
+                                                        model_hparams={"num_classes": 10,
+                                                                       "act_fn": nn.relu},
+                                                        optimizer_name="adamw",
+                                                        optimizer_hparams={"lr": 1e-3,
+                                                                           "weight_decay": 1e-4},
+                                                        exmp_imgs=jax.device_put(
+                                                            next(iter(train_loader))[0]),
+                                                        num_epochs=200)
+
+print("GoogleNet Results", googlenet_results)
