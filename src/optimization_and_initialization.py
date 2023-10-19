@@ -631,3 +631,39 @@ ax.plot(SGDMom_points[:,0], SGDMom_points[:,1], color="blue", marker="o", zorder
 ax.plot(Adam_points[:,0], Adam_points[:,1], color="grey", marker="o", zorder=3, label="Adam")
 plt.legend()
 plt.show()
+
+# Steep Optima
+
+def bivar_gaussian(w1, w2, x_mean=0.0, y_mean=0.0, x_sig=1.0, y_sig=1.0):
+    norm = 1 / (2 * np.pi * x_sig * y_sig)
+    x_exp = (-1 * (w1 - x_mean)**2) / (2 * x_sig**2)
+    y_exp = (-1 * (w2 - y_mean)**2) / (2 * y_sig**2)
+    return norm * jnp.exp(x_exp + y_exp)
+
+def comb_func(w1, w2):
+    z = -bivar_gaussian(w1, w2, x_mean=1.0, y_mean=-0.5, x_sig=0.2, y_sig=0.2)
+    z -= bivar_gaussian(w1, w2, x_mean=-1.0, y_mean=0.5, x_sig=0.2, y_sig=0.2)
+    z -= bivar_gaussian(w1, w2, x_mean=-0.5, y_mean=-0.8, x_sig=0.2, y_sig=0.2)
+    return z
+
+_ = plot_curve(comb_func, x_range=(-2,2), y_range=(-2,2), plot_3d=True, title="Steep optima")
+
+
+SGD_points = train_curve(sgd(lr=.5), comb_func, init=[0,0])
+SGDMom_points = train_curve(sgd_momentum(lr=1, momentum=0.9), comb_func, init=[0,0])
+Adam_points = train_curve(adam(lr=0.2), comb_func, init=[0,0])
+
+all_points = np.concatenate([SGD_points, SGDMom_points, Adam_points], axis=0)
+ax = plot_curve(comb_func,
+                x_range=(-2, 2),
+                y_range=(-2, 2),
+                plot_3d=False,
+                title="Steep optima")
+ax.plot(SGD_points[:,0], SGD_points[:,1], color="red", marker="o", zorder=3, label="SGD", alpha=0.7)
+ax.plot(SGDMom_points[:,0], SGDMom_points[:,1], color="blue", marker="o", zorder=2, label="SGDMom", alpha=0.7)
+ax.plot(Adam_points[:,0], Adam_points[:,1], color="grey", marker="o", zorder=1, label="Adam", alpha=0.7)
+ax.set_xlim(-2, 2)
+ax.set_ylim(-2, 2)
+plt.legend()
+plt.show()
+
