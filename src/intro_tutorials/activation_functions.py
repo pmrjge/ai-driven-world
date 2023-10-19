@@ -24,7 +24,7 @@ import optax
 import urllib.request
 from urllib.error import HTTPError
 
-DATASET_PATH = "../../data"
+DATASET_PATH = "../../../data"
 CHECKPOINT_PATH = "../../saved_models/tutorial3_jax"
 
 

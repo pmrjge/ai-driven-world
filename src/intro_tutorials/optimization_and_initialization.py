@@ -33,9 +33,9 @@ from flax.training import train_state, checkpoints
 import optax
 
 # Path to the folder where the datasets are/should be downloaded (e.g. MNIST)
-DATASET_PATH = "../../data"
+DATASET_PATH = "../../../data"
 # Path to the folder where the pretrained models are saved
-CHECKPOINT_PATH = "../../saved_models/tutorial4_jax"
+CHECKPOINT_PATH = "../../../saved_models/tutorial4_jax"
 
 # Verifying the device that will be used throughout this notebook
 print("Device:", jax.devices()[0])
