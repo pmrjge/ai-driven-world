@@ -550,3 +550,12 @@ def adam(lr, beta1=0.9, beta2=0.999, eps=1e-8):
 
 
 # comparing optimizers on model training
+
+model, params = init_simple_model(kaiming_init, act_fn=nn.relu)
+
+_ = train_model(model, params, sgd(lr=1e-1), "FashionMNIST_SGD", max_epochs=40, batch_size=256)
+
+_ = train_model(model, params, sgd_momentum(lr=1e-1, momentum=0.9), "FashionMNIST_SGDMom", max_epochs=40, batch_size=256)
+
+_ = train_model(model, params, adam(lr=1e-3), "FashionMNIST_Adam", max_epochs=40, batch_size=256)
+
