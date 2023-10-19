@@ -297,3 +297,19 @@ def train_classifier(*args, num_epochs=200, **kwargs):
     val_acc = trainer.eval_model(val_loader)
     test_acc = trainer.eval_model(test_loader)
     return trainer, {'val': val_acc, 'test': test_acc}
+
+
+googlenet_kernel_init = nn.initializers.kaiming_normal()
+
+class InceptionBlock(nn.Module):
+    c_red: dict
+    c_out: dict
+    act_fn: callable
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        x_1x1 = nn.Conv(self.c_out["1x1"], kernel_size=(1, 1), kernel_init=googlenet_kernel_init, use_bias=False)(x)
+        x_1x1 = nn.BatchNorm()(x_1x1, use_running_average=not train)
+        x_1x1 = self.act_fn(x_1x1)
+
+        x_3x3 = nn.Conv(self.c_red["3x3"], kernel_size=(1,1), kernel_init=googlenet_kernel_init, use_bias=False)(x)
