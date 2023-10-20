@@ -377,3 +377,98 @@ googlenet_trainer, googlenet_results = train_classifier(model_class=GoogleNet,
                                                         num_epochs=200)
 
 print("GoogleNet Results", googlenet_results)
+
+resnet_kernel_init = nn.initializers.variance_scaling(2.0, mode='fan_out', distribution='normal')
+
+class ResNetBlock(nn.Module):
+    act_fn: callable
+    c_out: int
+    subsample: bool = False
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        z = nn.Conv(self.c_out, kernel_size=(3,3), strides=(1,1) if not self.subsample else (2, 2),
+                    kernel_init=resnet_kernel_init, use_bias=False)(x)
+        z = nn.BatchNorm()(z, use_running_average=not train)
+        z = self.act_fn(z)
+        z = nn.Conv(self.c_out, kernel_size=(3, 3), kernel_init=resnet_kernel_init, use_bias=False)(z)
+        z = nn.BatchNorm()(z, use_running_average=not train)
+        if self.subsample:
+            x = nn.Conv(self.c_out, kernel_size=(1,1), strides=(2,2), kernel_init=resnet_kernel_init)(x)
+        x_out = self.act_fn(z + x)
+        return x_out
+
+
+class PreActResNetBlock(ResNetBlock):
+    @nn.compact
+    def __call__(self, x, train=True):
+        z = nn.BatchNorm()(x, use_running_average=not train)
+        z = self.act_fn(z)
+        z = nn.Conv(self.c_out, kernel_size=(3,3), strides=(1,1) if not self.subsample else (2,2),
+                    kernel_init=resnet_kernel_init, use_bias=False)(z)
+        z = nn.BatchNorm()(z, use_running_average=not train)
+        z = self.act_fn(z)
+        z = nn.Conv(self.c_out, kernel_size=(3,3), kernel_init=resnet_kernel_init, use_bias=False)(z)
+
+        if self.subsample:
+            x = nn.BatchNorm()(x, use_running_average=not train)
+            x = self.act_fn(x)
+            x = nn.Conv(self.c_out, kernel_size=(1,1), strides=(2,2), kernel_init=resnet_kernel_init, use_bias=False)(x)
+        x_out = x + z
+        return x_out
+
+
+class ResNet(nn.Module):
+    num_classes: int
+    act_fn: callable
+    block_class: nn.Module
+    num_blocks = (3, 3, 3)
+    c_hidden: tuple = (16, 32, 64)
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        x = nn.Conv(self.c_hidden[0], kernel_size=(3,3), kernel_init=resnet_kernel_init, use_bias=False)(x)
+        if self.block_class == ResNetBlock:
+            x = nn.BatchNorm()(x, use_running_average=not Train)
+            x = self.act_fn(x)
+
+        for block_idx, block_count in enumerate(self.num_blocks):
+            for bc in range(block_count):
+                subsample = (bc == 0 and block_idx > 0)
+                x = self.block_class(c_out=self.c_hidden[block_idx], act_fn=self.act_fn, subsample=subsample)(x, train=train)
+        x = x.mean(axis=(1, 2))
+        x = nn.Dense(self.num_classes)(x)
+        return x
+
+
+resnet_trainer, resnet_results = train_classifier(model_name="ResNet",
+                                                  model_class=ResNet,
+                                                  model_hparams={"num_classes": 10,
+                                                                 "c_hidden": (16, 32, 64),
+                                                                 "num_blocks": (3, 3, 3),
+                                                                 "act_fn": nn.relu,
+                                                                 "block_class": ResNetBlock},
+                                                  optimizer_name="SGD",
+                                                  optimizer_hparams={"lr": 0.1,
+                                                                     "momentum": 0.9,
+                                                                     "weight_decay": 1e-4},
+                                                  exmp_imgs=jax.device_put(
+                                                      next(iter(train_loader))[0]),
+                                                  num_epochs=200)
+
+
+preactresnet_trainer, preactresnet_results = train_classifier(model_name="PreActResNet",
+                                                              model_class=ResNet,
+                                                              model_hparams={"num_classes": 10,
+                                                                             "c_hidden": (16, 32, 64),
+                                                                             "num_blocks": (3, 3, 3),
+                                                                             "act_fn": nn.relu,
+                                                                             "block_class": PreActResNetBlock},
+                                                              optimizer_name="SGD",
+                                                              optimizer_hparams={"lr": 0.1,
+                                                                                 "momentum": 0.9,
+                                                                                 "weight_decay": 1e-4},
+                                                              exmp_imgs=jax.device_put(
+                                                                  next(iter(train_loader))[0]),
+                                                              num_epochs=200)
+
