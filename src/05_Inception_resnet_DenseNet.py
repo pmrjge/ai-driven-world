@@ -472,3 +472,87 @@ preactresnet_trainer, preactresnet_results = train_classifier(model_name="PreAct
                                                                   next(iter(train_loader))[0]),
                                                               num_epochs=200)
 
+
+# DenseNet
+
+densenet_kernel_init = nn.initializers.kaiming_normal()
+
+class DenseLayer(nn.Module):
+    bn_size: int
+    growth_rate: int
+    act_fn: callable
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        z = nn.BatchNorm()(x, use_running_average=not train)
+        z = self.act_fn(z)
+        z = nn.Conv(self.bn_size * self.growth_rate, kernel_size=(1,1), kernel_init=densenet_kernel_init, use_bias=False)(z)
+        z = nn.BatchNorm()(z, use_running_average=not train)
+        z = self.act_fn(z)
+        z = nn.Conv(self.growth_rate, kernel_size=(3,3), kernel_init=densenet_kernel_init, use_bias=False)(z)
+        x_out = jnp.concatenate([x, z], axis=-1)
+        return x_out
+
+class DenseBlock(nn.Module):
+    num_layers: int
+    bn_size: int
+    growth_rate: int
+    act_fn: callable
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        for _ in range(self.num_layers):
+            x = DenseLayer(bn_size=self.bn_size, growth_rate=self.growth_rate, act_fn=self.act_fn)(x, train=train)
+
+        return x
+
+class TransitionLayer(nn.Module):
+    c_out: int
+    act_fn: callable
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        x = nn.BatchNorm()(x, use_running_average=not train)
+        x = self.act_fn(x)
+        x = nn.Conv(self.c_out, kernel_size=(1,1), kernel_init=densenet_kernel_init, use_bias=False)(x)
+        x = nn.avg_pool(x, (2,2), strides=(2,2))
+        return x
+
+
+class DenseNet(nn.Module):
+    num_classes: int
+    act_fn: callable = nn.relu
+    num_layers: tuple = (6, 6, 6, 6)
+    bn_size: int = 2
+    growth_rate: int = 16
+
+    @nn.compact
+    def __call__(self, x, train=True):
+        c_hidden = self.growth_rate * self.bn_size
+
+        x = nn.Conv(c_hidden, kernel_size=(3,3), kernel_init=densenet_kernel_init)(x)
+        for block_idx, num_layers in enumerate(self.num_layers):
+            x = DenseBlock(num_layers=num_layers, bn_size=self.bn_size, growth_rate=self.growth_rate, act_fn=self.act_fn)(x, train=train)
+            c_hidden += num_layers * self.growth_rate
+            if block_idx < len(self.num_layers)-1:
+                x = TransitionLayer(c_out=c_hidden // 2, act_fn=self.act_fn)(x, train=train)
+        x = nn.BatchNorm()(x, use_running_average=not train)
+        x = self.act_fn(x)
+        x = x.mean(axis=(1, 2))
+        x = nn.Dense(self.num_classes)(x)
+        return x
+
+
+densenet_trainer, densenet_results = train_classifier(model_name="DenseNet",
+                                                      model_class=DenseNet,
+                                                      model_hparams={"num_classes": 10,
+                                                                     "num_layers": [6, 6, 6, 6],
+                                                                     "bn_size": 2,
+                                                                     "growth_rate": 16,
+                                                                     "act_fn": nn.relu},
+                                                      optimizer_name="adamw",
+                                                      optimizer_hparams={"lr": 1e-3,
+                                                                         "weight_decay": 1e-4},
+                                                      exmp_imgs=jax.device_put(
+                                                          next(iter(train_loader))[0]),
+                                                      num_epochs=200)
